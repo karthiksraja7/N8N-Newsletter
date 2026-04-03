@@ -40,7 +40,7 @@ Before running this workflow, make sure you have:
 
 ### 1. Clone this repository
 ```bash
-git clone https://github.com/your-username/newsletter-n8n.git
+git clone https://github.com/karthiksraja7/Newsletter.json
 cd newsletter-n8n
 ```
 

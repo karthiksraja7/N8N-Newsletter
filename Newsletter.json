@@ -1,0 +1,449 @@
+{
+  "name": "Newsletter",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://www.hindutamil.in/feed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        -80
+      ],
+      "id": "5409a238-85eb-4e57-930a-ca0529dc11c3",
+      "name": "RSS Read"
+    },
+    {
+      "parameters": {
+        "jsCode": "const articles = $input.all();\n\n// Sort by date and take top 5\nconst top5 = articles\n  .sort((a, b) => new Date(b.json.pubDate) - new Date(a.json.pubDate))\n  .slice(0, 5);\n\nreturn top5.map(item => ({\n  json: {\n    title: item.json.title,\n    link: item.json.link,\n    pubDate: item.json.pubDate,\n    contentSnippet: item.json.contentSnippet || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -80
+      ],
+      "id": "a1bea839-b938-4f03-8336-5d3dee2803b9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const articles = $input.all();\nconst results = [];\n\nfor (const item of articles) {\n  const { title, contentSnippet, link, pubDate } = item.json;\n\n  const prompt = `Summarize the following news in maximum 50 words in a clear and engaging way:\\n\\nTitle: ${title}\\n\\nContent: ${contentSnippet}`;\n\n  try {\n    const response = await $http.request({\n      method: 'POST',\n      url: 'https://api.openai.com/v1/chat/completions',\n      headers: {\n        'Content-Type': 'application/json',\n        'Authorization': 'Bearer YOUR_OPENAI_API_KEY'\n      },\n      body: {\n        model: 'gpt-3.5-turbo',\n        messages: [{ role: 'user', content: prompt }],\n        max_tokens: 100\n      },\n      json: true\n    });\n\n    const summary = response.choices?.[0]?.message?.content?.trim()\n      || contentSnippet.split(' ').slice(0, 50).join(' ') + '...';\n\n    results.push({ json: { title, link, pubDate, summary } });\n\n  } catch (error) {\n    // Fallback to first 50 words if API fails\n    const fallback = contentSnippet.split(' ').slice(0, 50).join(' ') + '...';\n    results.push({ json: { title, link, pubDate, summary: fallback } });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        -80
+      ],
+      "id": "56fac5d7-5d96-48e3-b429-5e141bf426da",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "sendTo": "karthiksraja7@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        976,
+        -208
+      ],
+      "id": "ace5c908-cd0d-462c-95b4-adf49fac3d37",
+      "name": "Send a message",
+      "webhookId": "090ddfeb-cac2-473c-9ed6-7d29e35a347b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "QGn5ecliATfQtwki",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ✅ Use .all() to collect all items properly\nconst articles = $input.all();\n\nconst headerColors = [\n  { bg: '#FF6B6B', light: '#fff0f0', icon: '🔴' },\n  { bg: '#4ECDC4', light: '#f0fffe', icon: '🟢' },\n  { bg: '#45B7D1', light: '#f0f9ff', icon: '🔵' },\n  { bg: '#96CEB4', light: '#f0fff5', icon: '🟡' },\n  { bg: '#DDA0DD', light: '#fdf0ff', icon: '🟣' }\n];\n\nconst cards = articles.map((item, index) => {\n  const { title, link, pubDate, summary } = item.json;\n  const color = headerColors[index];\n  const dateStr = new Date(pubDate).toLocaleDateString('en-IN', {\n    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'\n  });\n\n  return `\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"\n      margin-bottom: 20px;\n      border-radius: 12px;\n      overflow: hidden;\n      box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n    \">\n      <tr>\n        <td style=\"\n          background: ${color.bg};\n          padding: 14px 18px;\n          border-radius: 12px 12px 0 0;\n        \">\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n            <tr>\n              <td>\n                <span style=\"\n                  color: white; font-size: 11px;\n                  font-weight: bold; text-transform: uppercase;\n                  letter-spacing: 1px; opacity: 0.9;\n                \">${color.icon} News ${String(index + 1).padStart(2, '0')}</span>\n              </td>\n              <td align=\"right\">\n                <span style=\"color:white; font-size:11px; opacity:0.85;\">\n                  📅 ${dateStr}\n                </span>\n              </td>\n            </tr>\n          </table>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"background:${color.light}; padding:16px 18px 8px;\">\n          <a href=\"${link}\" style=\"\n            color: ${color.bg}; font-size: 16px;\n            font-weight: bold; text-decoration: none;\n            line-height: 1.5; display: block;\n          \">${title}</a>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"background:${color.light}; padding:8px 18px 16px;\">\n          <p style=\"\n            color: #444; font-size: 13px;\n            line-height: 1.7; margin: 0 0 14px;\n          \">${summary}</p>\n          <a href=\"${link}\" style=\"\n            display: inline-block; background: ${color.bg};\n            color: white; font-size: 12px; font-weight: bold;\n            padding: 8px 18px; border-radius: 25px;\n            text-decoration: none; letter-spacing: 0.5px;\n          \">Read Full Story →</a>\n        </td>\n      </tr>\n    </table>`;\n}).join('');\n\n// ✅ Build Telegram message\nconst telegramLines = articles.map((item, index) => {\n  const { title, link, summary } = item.json;\n  const icons = ['🔴','🟢','🔵','🟡','🟣'];\n  return `${icons[index]} *News ${String(index + 1).padStart(2, '0')}*\\n*${title}*\\n${summary}\\n[Read More](${link})`;\n}).join('\\n\\n─────────────\\n\\n');\n\nconst today = new Date().toLocaleDateString('en-IN', {\n  weekday: 'long', year: 'numeric',\n  month: 'long', day: 'numeric'\n});\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body style=\"margin:0; padding:0; background:#f0f2f5;\">\n  <div style=\"max-width:640px; margin:auto; padding:20px; font-family:Arial,sans-serif;\">\n\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"\n      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);\n      border-radius: 14px; margin-bottom: 24px; overflow: hidden;\n    \">\n      <tr>\n        <td style=\"padding:30px 24px; text-align:center;\">\n          <div style=\"font-size:36px; margin-bottom:10px;\">📰</div>\n          <h1 style=\"color:white; margin:0 0 8px; font-size:24px;\">\n            Daily News Digest\n          </h1>\n          <p style=\"color:#aac4e0; margin:0; font-size:13px;\">${today}</p>\n          <div style=\"\n            width:50px; height:3px;\n            background:linear-gradient(to right, #FF6B6B, #4ECDC4);\n            margin:14px auto 0; border-radius:2px;\n          \"></div>\n          <p style=\"color:#aac4e0; font-size:12px; margin:10px 0 0;\">\n            🗞️ Top 5 Stories · AI Summarized\n          </p>\n        </td>\n      </tr>\n    </table>\n\n    <div style=\"background:white; border-radius:10px; padding:10px;\">\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">${cards}</table>\n    </div>\n\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"\n      background:#1a1a2e; border-radius:12px; margin-top:10px;\n    \">\n      <tr>\n        <td style=\"padding:20px; text-align:center;\">\n          <p style=\"color:#aac4e0; font-size:12px; margin:0 0 6px;\">\n            Powered by <strong style=\"color:white;\">n8n</strong> +\n            <strong style=\"color:white;\">AI Summarizer</strong>\n          </p>\n          <p style=\"color:#666; font-size:11px; margin:0;\">\n            <a href=\"#\" style=\"color:#4ECDC4; text-decoration:none;\">Unsubscribe</a> ·\n            <a href=\"#\" style=\"color:#4ECDC4; text-decoration:none;\">View Online</a>\n          </p>\n        </td>\n      </tr>\n    </table>\n\n  </div>\n</body>\n</html>`;\n\n// ✅ KEY FIX — Return single item so both Email\n// and Telegram can use .first() without pairing error\nreturn [{\n  json: {\n    html,\n    subject: `📰 Daily News Digest – ${today}`,\n    telegramText: `📰 *Daily News Digest*\\n_${today}_\\n\\n${telegramLines}`,\n    articleCount: articles.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        -80
+      ],
+      "id": "ac80cca6-5064-4549-8ca9-f470bdb5f233",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -544,
+        -80
+      ],
+      "id": "35d1037e-55c4-4beb-8060-e1097552d357",
+      "name": "Telegram Trigger",
+      "webhookId": "d0494cdb-502d-4fde-9c40-419bf90ec3b1",
+      "credentials": {
+        "telegramApi": {
+          "id": "lcgsf1pT6JUAbthQ",
+          "name": "SKR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c2dfe92f-1530-46b9-b9fc-7864045eded1",
+              "name": "Message",
+              "value": "={{ $json.message.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -336,
+        -80
+      ],
+      "id": "02cf75c7-9887-4a40-a09b-547015bd58d4",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Message }}",
+                    "rightValue": "Newsletter",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "68bd9623-04ab-4a4e-a1c3-5f70fb240301"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "27ed8235-3838-4393-a7ee-39acc4a3dbf4",
+                    "leftValue": "={{ $json.Message }}",
+                    "rightValue": "newsletter",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a4c8c828-aa38-4a58-ab21-82064fb721c2",
+                    "leftValue": "={{ $json.Message }}",
+                    "rightValue": "Newsletter",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f7aeb8d9-1322-4cb8-85de-cd8ecb06f43e",
+                    "leftValue": "={{ $json.Message }}",
+                    "rightValue": "newsletter",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        -80
+      ],
+      "id": "481bbf39-0f5c-47a8-90e8-7a67fb44332b",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "chatId": "951888329",
+        "text": "={{ $json.telegramText }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        992,
+        64
+      ],
+      "id": "a61a721c-842d-4476-9ea8-40fbbd937cbc",
+      "name": "Send a text message1",
+      "webhookId": "f52d800e-7ca9-4288-b472-83bff75d6499",
+      "credentials": {
+        "telegramApi": {
+          "id": "lcgsf1pT6JUAbthQ",
+          "name": "SKR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "Explain this clearly with key details, examples, and step-by-step reasoning where applicable"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        128,
+        144
+      ],
+      "id": "98874aca-7316-4df3-bc0e-5cd9327806d3",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "SKjEdjMlkRrvEk0E",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output[0].content[0].text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        144
+      ],
+      "id": "95ecd1cd-548f-4467-9191-708d4a6a5973",
+      "name": "Send a text message",
+      "webhookId": "5699a19f-c12b-449d-9470-5ebc4f782405",
+      "credentials": {
+        "telegramApi": {
+          "id": "lcgsf1pT6JUAbthQ",
+          "name": "SKR"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message1": {
+      "main": [
+        []
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "da281e92-d665-427d-bae5-6178c97bd94f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dd6f17d518e72c7a1dcdf6d7f32cc93671e1f8c59308cd74b6f661a54b2041bb"
+  },
+  "id": "yOhpaLOAt40stbJb",
+  "tags": []
+}

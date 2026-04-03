@@ -75,7 +75,8 @@ newsletter-n8n/
 
 ## 📸 Workflow Preview
 
-> _Add a screenshot of your n8n workflow canvas here_
+> <img width="1060" height="353" alt="image" src="https://github.com/user-attachments/assets/e1537eda-49c5-40c0-8cdc-84cb9ab2cdc2" />
+
 
 ---
 
